@@ -1,0 +1,249 @@
+---
+slug: webgl-3
+title: WebGl-3
+date: 2021-04-10
+author: matoz
+tags:
+  - develop
+---
+
+### 1.4 基本图元
+
+#### 1.4.1 绘制基本图元
+
+​ **在 WebGl 程序中可以通过 `drawArray() ` 方法从向量数组中绘制图元。**
+
+- `gl.POINTS`: 绘制一系列点。
+- `gl.LINE_STRIP`: 绘制一个线条。即，绘制一系列线段，上一点连接下一点。
+- `gl.LINE_LOOP`: 绘制一个线圈。即，绘制一系列线段，上一点连接下一点，并且最后一点与第一个点相连。
+- `gl.LINES`: 绘制一系列单独线段。每两个点作为端点，线段之间不连接。
+- `gl.TRIANGLE_STRIP`：绘制一个三角带。
+- `gl.TRIANGLE_FAN`：绘制一个三角扇。
+- `gl.TRIANGLES`: 绘制一系列三角形。每三个点作为顶点。
+
+##### 1. 引入小程序单选组件
+
+- **`radio`** 单选项目标签。
+- **`radio-group`** 单项选择器，内部由多个 radio 标签组成。
+
+1. **数据绑定**
+
+通过数据绑定，可以使 WXML 文件中的组件动态的获取对应 Page 的 data
+
+```html
+<radio value="{{item.value}}" checked="{{item.checked}}" />
+```
+
+2. **列表渲染**
+
+在组件上使用 `wx:for` 控制属性绑定一个数组，即可使用数组中各项的数据重复渲染该组件。
+
+```html
+<label class="container2__checkcell" wx:for="{{items}}" wx:key="index">
+  <view class="weui-cell__hd">
+    <radio value="{{item.value}}" checked="{{item.checked}}" />
+  </view>
+  <view class="weui-cell__bd">{{item.name}}</view>
+</label>
+```
+
+即使用 data 中 item 的数组来重复渲染 `<label>` 标签。
+
+> 🔔 为了提高列表渲染效率，需要在使用列表渲染时使用 `wx:key` 来指定列表中项目的唯一的标识符。`wx:key` 的值以两种形式提供：
+>
+> 1. 字符串，代表在 for 循环的 array 中 item 的某个 property，该 property 的值需要是列表中唯一的字符串或数字，且不能动态改变。
+> 2. 关键字 `*this` 代表在 for 循环中的 item 本身，表示需要 item 本身是一个唯一的字符串或者数字。
+>
+> 否则在动态添加数据或改变元素顺序导致数据改变时，框架会重新渲染组件。
+
+**因此可以在 WXML 文件中定义以下单选视图:**
+
+```html
+<view class="weui-cells weui-cells_after-title">
+  <radio-group bindchange="radioChange">
+    <label
+      class="weui-cell weui-check__label container2__checkcell"
+      wx:for="{{items}}"
+      wx:key="index"
+    >
+      <view class="weui-cell__hd">
+        <radio value="{{item.value}}" checked="{{item.checked}}" />
+      </view>
+      <view class="weui-cell__bd">{{item.name}}</view>
+    </label>
+  </radio-group>
+</view>
+```
+
+> 🔔 列表渲染默认数组的当前项的下标变量名默认为 `index`，数组当前项的变量名默认为 `item`，可使用 `wx:for-item` 可以指定数组当前元素的变量名，使用 `wx:for-index` 可以指定数组当前下标的变量名。
+
+##### 2. **定义事件处理函数 `radioChange()`**
+
+```javascript
+radioChange: function (event) {
+    const value = event.detail.value;
+    var items = this.data.items;
+    for (var i = 0; i < items.length; i++) {
+      items[i].checked = (value === items[i].value);
+    }
+    this.setData({
+      items: items
+    })
+    this.onShow();
+  },
+```
+
+即在选中任一单选按钮时，对应按钮 checked 的值被设为 true。
+
+##### 3. 绘制
+
+1. 定义绘制函数 `drawFun()`
+
+```javascript
+drawFun: function (gl, n) {
+    const items = this.data.items;
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.POINTS, 0, n);
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].checked) {
+        switch (i) {
+          case 0:
+            gl.drawArrays(gl.POINTS, 0, n);
+            break;
+          case 1:
+            gl.drawArrays(gl.LINES, 0, n);
+            break;
+          case 2:
+            gl.drawArrays(gl.LINE_STRIP, 0, n);
+            break;
+          case 3:
+            gl.drawArrays(gl.LINE_LOOP, 0, n);
+            break;
+          case 4:
+            gl.drawArrays(gl.TRIANGLES, 0, n);
+            break;
+          case 5:
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, n);
+            break;
+          case 6:
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, n);
+            break;
+        }
+      }
+    }
+  }
+```
+
+当任意单选按钮被选择时，即该按钮的 checked 属性为 true 时，进行对应的绘制。
+
+2. 在主函数中使用 `drawFun()` 函数
+
+```javascript
+this.drawFun(gl, n);
+// gl.clear(gl.COLOR_BUFFER_BIT);
+// gl.drawArrays(gl.POINTS, 0, n);
+```
+
+#### 1.4.2 绘制四边形
+
+​ 在 1.4.1 的基础上使用不同的组件实现更多功能
+
+##### 1. 通过 `radio` 实现颜色选择
+
+- 在 data 中定义 color 的值
+
+```javascript
+colors: [
+      {value: 'RED', name: '红',checked:true},
+      {value: 'GREEN', name: '绿'},
+      {value: 'BLUE', name: '蓝'},
+      {value: 'YELLOW', name: '黄'},
+      {value: 'CYAN', name: '青'},
+      {value: 'PURPLE', name: '紫'},
+    ],
+```
+
+- 定义事件处理函数 `radioChange()`
+- 定义设置颜色函数 `setColor()`
+
+```javascript
+setColor: function (gl) {
+    const uColor = gl.getUniformLocation(gl.program, 'uColor');
+    const colors = this.data.colors;
+    for (let i = 0; i < colors.length; i++) {
+      if (colors[i].checked) {
+        switch (i) {
+          case 0:
+            gl.uniform4f(uColor, 1.0, 0.0, 0.0, 1.0);
+            break;
+          case 1:
+            gl.uniform4f(uColor, 0.0, 1.0, 0.0, 1.0);
+            break;
+          case 2:
+            gl.uniform4f(uColor, 0.0, 0.0, 1.0, 1.0);
+            break;
+          case 3:
+            gl.uniform4f(uColor, 1.0, 1.0, 0.0, 1.0);
+            break;
+          case 4:
+            gl.uniform4f(uColor, 0.0, 1.0, 1.0, 1.0);
+            break;
+          case 5:
+            gl.uniform4f(uColor, 1.0, 0.0, 1.0, 1.0);
+            break;
+        }
+      }
+    }
+  },
+```
+
+当任意单选按钮被选择时，即该按钮的 checked 属性为 true 时，通过定义不同的颜色值，通过 uniform 变量向着色器中传值进行绘制颜色。
+
+- 在主函数中使用 `setColor()` 函数
+
+```javascript
+// var uColor = gl.getUniformLocation(program, 'uColor');
+// gl.uniform4f(uColor, 0.0, 1.0, 0.0, 1.0);
+this.setColor(gl);
+```
+
+##### 2. 通过 `switch` 实现是否填充
+
+- 在 WXML 中引入 switch 组件
+
+```html
+<switch checked="{{switchChecked}}" bindchange="onSwitchChange" />
+```
+
+- 定义 `onSwitchChange()` 函数
+
+```javascript
+onSwitchChange: function (event) {
+    this.data.switchChecked = event.detail.value;
+    this.onShow();
+  }
+```
+
+- 通过 `drawFun()` 函数进行是否填充绘制
+
+```javascript
+drawFun: function(gl, n) {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.POINTS, 0, n);
+    if (this.data.switchChecked) {
+      for (let i = 0; i < n / 4; i++) {
+        var m = Math.min(4, n - 4 * i);
+        gl.drawArrays(gl.TRIANGLE_FAN, i*4, m);
+      }
+    } else {
+      for (let i = 0; i < n / 4; i++) {
+        var m = Math.min(4, n - 4 * i);
+        gl.drawArrays(gl.LINE_LOOP, i*4, m);
+      }
+    }
+  },
+```
+
+若 switchChecked 为 true，绘制三角扇；若 switchChecked 为 false，绘制回路，达到是否填充的效果。
+
+> 🔔 为了使得所化的图形最多为四边形，动态控制 `drawArray()` 函数四个点后重新开始绘制。

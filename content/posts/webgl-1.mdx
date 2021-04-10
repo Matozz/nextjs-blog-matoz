@@ -1,0 +1,210 @@
+---
+slug: webgl-1
+title: WebGl-1
+date: 2021-04-10
+author: matoz
+tags:
+  - develop
+---
+
+### 1.1 什么是WebGL
+
+WebGL使得网页在支持HTML`<canvas>`标签的浏览器中, 不需要使用任何插件, 便可以使用基于OpenGL ES 2.0 的API在canvas中进行3D渲染. WebGL程序由javascript的控制代码, 和在计算机的图形处理单元 (GPU, Graphics Processing Unit) 中执行的着色器语言 (GLSL ES) 组成. WebGL元素可以和其他HTML元素混合, 并且会和页面的其他部分或页面背景相合成.
+
+绘制WebGL时候有两种不同的着色器函数, **顶点着色器和片元着色器.**通过用GLSL ES语言编写着色器, 并将代码文本传递给WebGL, 使之在GPU执行时编译.
+
+* **顶点着色器 (Vertex shader)**
+
+  每次渲染一个形状时, 顶点着色器会在形状中的每个顶点运行. 它的工作是将输入顶点从原始坐标系转换到WebGL使用的缩放空间(**clipspace**)坐标系, 其中每个轴的坐标范围从-1.0到1.0, 并且不考虑纵横比, 实际尺寸或任何其他因素. 对顶点坐标进行必要的转换后, 在每个顶点基础上进行其他调整或计算, 然后通过将其保存在由GLSL提供的`gl_Position`中来返回变换后的顶点.
+
+* **片元着色器 (Fragment shader)**
+
+  片元着色器在顶点着色器处理完图形的顶点后, 会被要绘制的每个图形的每个像素点调用一次. 确定像素的颜色，通过指定应用到像素的纹理元素 (也就是图形纹理中的像素) , 获取纹理元素的颜色, 然后将适当的光照应用于颜色. 之后颜色存储在特殊变量`gl_FragColor`中, 返回到WebGL层.
+
+### 1.2 使用小程序创建WebGL
+
+​	与网页编程相似, 小程序采用与之类似的WXML+WXSS+JS组合来描述页面结构。
+
+#### 1.2.1 创建Canvas画布
+
+1. **使用`<canvas>`标签在WXML文件中创建由WebGL渲染的画布.**
+
+```html
+<view class="container">
+    <canvas type="webgl" id="point"></canvas>
+</view>
+```
+
+2. **在WXSS文件中给画布设置基本样式.**
+
+```css
+#point {
+  width: 700rpx;
+  height: 1000rpx;
+  margin: 10rpx;
+}
+```
+
+3. **在JS文件中的onReady函数下获取WebGL绘图环境**
+
+   通过提供的`wx.createSelctorQuery` (类似于`document.querySelector`) 节点选择器来获取canvas对象, 并获取WebGL绘制环境.
+
+```javascript
+onReady: function () {
+    const query = wx.createSelectorQuery();
+    query.select("#point").node().exec(res => {
+      const canvas = res[0].node;
+      const gl = canvas.getContext('webgl');      
+    })
+  },
+```
+
+> **🧐 ==为画布设置`border`与`border-radius`等属性时, 渲染出的WebGL于画布之上, 导致设置的样式只作用于底部画布层上.==**
+
+
+
+#### 1.2.2 设置画布背景 (最短的WebGL程序)
+
+1. **在设置好的WebGL绘制环境中通过`gl.clearColor()`函数设置背景色.**
+
+```javascript
+gl.clearColor(1.0, 0.0, 0.0, 1.0);
+```
+
+> 🔔 `gl.clearColor()`使用RGBA => (Red, Green, Blue, Alpha) 来设置颜色.
+
+2. **清空颜色缓冲区.**
+
+```javascript
+gl.clear(gl.COLOR_BUFFER_BIT);
+```
+
+> 即用背景色填充并擦除已绘制的内容.
+
+
+
+#### 1.2.3 使用着色器绘制一个点
+
+1. **引入初始化着色器函数initShaders**
+
+```javascript
+//声明初始化着色器函数
+const initShaders = (gl, vertexShaderSource, fragmentShaderSource) => {
+  //创建顶点着色器对象
+  var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+  //创建片元着色器对象
+  var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  //引入顶点、片元着色器源代码
+  gl.shaderSource(vertexShader, vertexShaderSource);
+  gl.shaderSource(fragmentShader, fragmentShaderSource);
+  //编译顶点、片元着色器
+  gl.compileShader(vertexShader);
+  gl.compileShader(fragmentShader);
+
+  //创建程序对象program
+  var program = gl.createProgram();
+  //附着顶点着色器和片元着色器到program
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  //链接program
+  gl.linkProgram(program);
+  //使用program
+  gl.useProgram(program);
+  //返回程序program对象
+  return program;
+}
+
+module.exports = {
+  initShader: initShaders
+}
+```
+
+2. **引入顶点着色器(vShader)与片元着色器(fShader)**
+
+```javascript
+//顶点着色器源码
+var vertexShaderSource = '' +
+    'void main(){' +
+    //给内置变量gl_PointSize赋值像素大小
+    '   gl_PointSize=20.0;' +
+    //顶点位置，位于坐标原点
+    '   gl_Position =vec4(0.0,0.0,0.0,1.0);' +
+    '}';
+
+//片元着色器源码
+var fragShaderSource = '' +
+'void main(){' +
+//定义片元颜色
+'   gl_FragColor = vec4(1.0,0.0,0.0,1.0);' +
+'}';
+
+module.exports = {
+  vShader: vertexShaderSource,
+  fShader: fragShaderSource
+}
+```
+
+3. **在JS绘制环境中初始化着色器**
+
+```javascript
+// 初始化着色器
+initShaders.initShader(gl, shaders.vShader, shaders.fShader);
+```
+
+> **🔔 需引入相应组件**
+
+4. **清理颜色缓冲区**
+
+5. **使用`gl.drawArray()`函数绘制点**
+
+```javascript
+gl.drawArrays(gl.POINTS, 0, 1);
+```
+
+> **🧐 ==在模拟器上可以看见所绘制的点, 在真机上进行调试时点不显示？==**
+
+
+
+#### 1.2.4 使用传值方式绘制点
+
+为了增加程序扩展性, 通过GLSL ES中的**attribute**和**uniform**变量，使得外部可以向着色器内传输数据.
+
+>`attribute` => 传输与顶点相关的数据.
+>
+>`uniform ` => 传输对于所有顶点都相同的 (或与顶点无关) 的数据.
+
+1. **在顶点着色器中声明attribute变量**
+
+```glsl
+'attribute vec4 aPosition;'
+```
+
+2. **将attribute变量赋值给gl_Position变量**
+
+```glsl
+'void main(){' +
+    '   gl_PointSize=20.0;' +
+    '   gl_Position =aPosition;' +
+    '}'
+```
+
+3. **在JS文件中获取attribute变量的存储位置**
+
+```javascript
+var aPosition =gl.getAttribLocation(program, 'aPosition');
+```
+
+> 🔔 `program`处参数为`initShader()`函数所创建的程序对象, 须在调用`initShader()`之后访问. 
+
+4. **将顶点位置传输给attribute变量**
+
+```javascript
+gl.vertexAttrib3f(aPosition, 0.0, 0.5, 0.0);
+```
+
+> 🔔 着色器中的a_Position变量为vec4类型的, 所以在与`verttexAttrib3f()`的同族函数中, 除了`verttexAttrib4f()`可以填充所有分量外, 使用其余函数未填的分量会被默认为 (0.0, 0.0, 0.0, 1.0).
+
+同理, 可以通过**uniform**变量传递颜色等参数.
+
+> 🔔 在片元着色器中传递参数时需要声明片元着色器的精度.
+
