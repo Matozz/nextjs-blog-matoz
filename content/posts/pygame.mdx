@@ -1,0 +1,459 @@
+---
+slug: pygame
+title: How games work in Python
+date: 2021-04-10
+author: matoz
+tags:
+  - develop
+---
+
+![Sample Image](/images/pygame_logo.gif)
+
+### 1. How games work in Python
+
+​ **An image that continuously updates + Game Logic**
+
+### 2. Python modules for games (Pygame)
+
+#### 2.1 Installing pygame
+
+#### 2.2 Import pygame and initialize the game
+
+1. `pygame.init()`
+2. display_surface(has width & height) -> **the canvas**
+3. game loop -> **game logic and canvas update**
+4. `pygame.quit()`
+
+```python
+import pygame
+
+pygame.init()
+screen = pygame.display.set_mode((576, 1024))
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+
+    pygame.display.update()
+```
+
+#### 2.3 Import sys
+
+​ use `sys.exit()` to shut down the game, otherwise the `pygame.display.update()` will keep running
+
+### 3. Getting into Pygame
+
+#### 3.1 Control the game frame rate
+
+​ How many pictures (/frames) a game draws in a single second
+
+_determined how fast your game run (**here is 120 FPS**)_
+
+```python
+clock = pygame.time.Clock()
+clock.tick(120)
+```
+
+#### 3.2 Images and surfaces
+
+> **Display Surface** -> always be shown and can be only one
+>
+> **Surface** -> can have multiple surfaces and only displayed when attacked to display surface
+
+**Load the Background Image -> `pygame.image.load()`**
+
+```python
+bg_surface = pygame.image.load('assets/background-day.png')
+screen.blit(bg_surface, (0, 0))
+```
+
+> In pygame positions are passed as an (X,Y) coordinate, ==(0,0) is at Top left==
+
+**Scale the Image -> `pygame.transform.scale2x()`**
+
+```python
+import pygame
+import sys
+
+pygame.init()
+screen = pygame.display.set_mode((576, 1024))
+clock = pygame.time.Clock()
+
+bg_surface = pygame.image.load('assets/background-day.png').convert()
+bg_surface = pygame.transform.scale2x(bg_surface)
+
+floor_surface = pygame.image.load('assets/base.png').convert()
+floor_surface = pygame.transform.scale2x(floor_surface)
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+    screen.blit(bg_surface, (0, 0))
+    screen.blit(floor_surface, (0, 900))
+
+    pygame.display.update()
+    clock.tick(120)
+```
+
+#### 3.3 Loop the floor (Surface)
+
+​ use two `floor_surface` to draw in a loop
+
+```python
+def draw_floor():
+    screen.blit(floor_surface, (floor_x_position, 900))
+    screen.blit(floor_surface, (floor_x_position + 576, 900))
+
+floor_x_position = 0
+
+while True:
+    # ...
+    floor_x_position -= 1
+    draw_floor()
+    if floor_x_position <= -576:
+        floor_x_position = 0
+```
+
+#### 3.4 Rects & Bird
+
+​ Rectangle have lots of points that can use to check collisions and place on the screen
+
+##### 3.4.1 Creating rectangles
+
+```python
+bird_surface = pygame.image.load('assets/bluebird-midflap.png').convert()
+bird_surface = pygame.transform.scale2x(bird_surface)
+bird_rect = bird_surface.get_rect(center=(100, 512))
+
+# In Loops
+screen.blit(bird_surface, bird_rect)
+```
+
+##### 3.4.2 Move the bird
+
+- Set the game variables
+
+```python
+gravity = 0.25
+bird_movement = 0
+bird_flap_height = 0
+```
+
+- Move the `bird_rect`
+
+```python
+bird_movement += gravity
+bird_rect.centery += bird_movement
+```
+
+- Bind the Key
+
+```python
+# In Loops
+if event.type == pygame.KEYDOWN:
+    if event.key == pygame.K_SPACE:
+        bird_movement = 0
+        bird_movement -= bird_flap_height
+```
+
+##### 3.4.3 Adding the pipes
+
+1. Import image on surface
+
+```python
+pipe_surface = pygame.image.load('assets/pipe-green.png')
+pipe_surface = pygame.transform.scale2x(pipe_surface)
+```
+
+2. Create pipe list
+
+set the timer to append new pipe into the pipe_list
+
+```python
+def create_pipe():
+    new_pipe = pipe_surface.get_rect(midtop=(288, 512))
+    return new_pipe
+
+pipe_list = []
+CREATEPIPE = pygame.USEREVENT
+pygame.time.set_timer(CREATEPIPE, 1200)
+
+		# In Loops
+        if event.type == CREATEPIPE:
+            pipe_list.extend(create_pipe())
+```
+
+3. Put rect around surface
+
+```python
+def move_pipes(pipes):
+    for pipe in pipes:
+        pipe.centerx -= 5
+    visible_pipes = [pipe for pipe in pipes if pipe.right > -50] # Clean The OutScreened Pipes
+	return visible_pipes
+
+
+def draw_pipes(pipes):
+    for pipe in pipes:
+        screen.blit(pipe_surface, pipe)
+
+
+pipe_list = move_pipes(pipe_list)
+draw_pipes(pipe_list)
+```
+
+4. random the pipe height & create top pipes
+
+```python
+import random
+
+def create_pipe():
+    random_pipe_height = random.choice(pipe_height)
+    bottom_pipe = pipe_surface.get_rect(midtop=(700, random_pipe_height))
+    top_pipe = pipe_surface.get_rect(midbottom=(700, random_pipe_height-300))
+    return bottom_pipe, top_pipe
+
+pipe_height = [400, 500, 600, 700, 800]
+```
+
+5. flip the top pipe direction
+
+```python
+def draw_pipes(pipes):
+    for pipe in pipes:
+        if pipe.bottom >= 1024:
+            screen.blit(pipe_surface, pipe)
+        else:
+            flipped_pipe = pygame.transform.flip(pipe_surface, False, True)
+            screen.blit(flipped_pipe, pipe)
+```
+
+### 4. Collisions
+
+​ use the `rect1.colliderect(rect2)` to check if rects are colliding with each other
+
+#### 4.1 Check Collision
+
+​ use `rect.colliderect()` to check if bird collide the pipes or fly out of screen
+
+```python
+def check_collision(pipes):
+    for pipe in pipes:
+        if bird_rect.colliderect(pipe):
+            print("collision")
+    if bird_rect.top <= -100 or bird_rect.bottom >= 900:
+        print("collision")
+
+ check_collision(pipe_list)
+```
+
+#### 4.2 Bring collision to the game
+
+- if collision happens, bird and pipes disappear
+
+```python
+def check_collision(pipes):
+    for pipe in pipes:
+        if bird_rect.colliderect(pipe):
+            return False
+    if bird_rect.top <= -100 or bird_rect.bottom >= 900:
+        return False
+
+    return True
+
+game_active = True
+
+    if game_active:
+        # Bird
+        bird_movement += gravity
+        bird_rect.centery += bird_movement
+        screen.blit(bird_surface, bird_rect)
+        game_active = check_collision(pipe_list)
+
+        # Pipes
+        pipe_list = move_pipes(pipe_list)
+        draw_pipes(pipe_list)
+```
+
+- bind `SPACE` key to restart the game
+
+```python
+# In Loops
+if event.type == pygame.KEYDOWN:
+    if event.key == pygame.K_SPACE and game_active:
+        bird_movement = 0
+        bird_movement -= bird_flap_height
+    if event.key == pygame.K_SPACE and game_active is False:
+        game_active = True
+        pipe_list.clear()
+        bird_rect.center = (100, 512)
+        bird_movement = 0
+```
+
+### 5. Rotating and Animating the bird
+
+#### 5.1 Rotating
+
+​ Because rotating surfaces lowers the quality, switch between original surface and rotated surface is a good solution
+
+1. import the bird on a surface
+
+
+2. rotate the bird on another surface
+
+```python
+def rotate_bird(bird):
+    new_bird = pygame.transform.rotozoom(bird, -bird_movement * 3, 1)
+    return new_bird
+
+    # In Loops
+    rotated_bird_surface = rotate_bird(bird_surface)
+    screen.blit(rotated_bird_surface, bird_rect)
+```
+
+> 🔔 By adding `convert_alpha()` to the bird_surface we can get a transparent background
+
+#### 5.2 Animation
+
+​ Knowing that pygame works by keep updating the images, by switch between several different surfaces, we can animation the bird
+
+1. import birdflap surface
+
+   s
+
+```python
+bird_downflap = pygame.transform.scale2x(pygame.image.load('assets/bluebird-downflap.png').convert_alpha())
+bird_midflap = pygame.transform.scale2x(pygame.image.load('assets/bluebird-midflap.png').convert_alpha())
+bird_upflap = pygame.transform.scale2x(pygame.image.load('assets/bluebird-upflap.png').convert_alpha())
+bird_frames = [bird_downflap, bird_midflap, bird_upflap]
+bird_index = 0
+bird_surface = bird_frames[bird_index]
+bird_rect = bird_surface.get_rect(center=(100, 512))
+```
+
+2. switching between flaps
+
+```python
+def bird_animation():
+    new_bird = bird_frames[bird_index]
+    new_bird_rect = new_bird.get_rect(center=(100, bird_rect.centery))
+    return new_bird, new_bird_rect
+
+BIRDFLAP = pygame.USEREVENT + 1
+pygame.time.set_timer(BIRDFLAP, 200)
+
+		# In Loops
+        if event.type == BIRDFLAP:
+            if bird_index < 2:
+                bird_index += 1
+            else:
+                bird_index = 0
+
+            bird_surface, bird_rect = bird_animation()
+```
+
+### 6. Scores
+
+> **score** -> score of the current game
+>
+> **high_score** -> best score of all games
+
+#### 6.1 Text in pygame
+
+- Create a font
+
+```python
+game_font = pygame.font.Font('04B_19.TTF', 40)
+```
+
+- Render the font on text surface
+
+```python
+def score_display():
+    score_surface = game_font.render(str(int(score)), True, (255, 255, 255))
+    score_text = score_surface.get_rect(center=(288, 100))
+    screen.blit(score_surface, score_text)
+
+
+    score_display()
+```
+
+> 🔔 Clean the score when restart game
+
+#### 6.2 Update Score
+
+```python
+def score_display(game_state):
+    if game_state == 'main_game':
+        score_surface = game_font.render(str(int(score)), True, (255, 255, 255))
+        score_rect = score_surface.get_rect(center=(288, 100))
+        screen.blit(score_surface, score_rect)
+    if game_state == 'game_over':
+        score_surface = game_font.render(f'Score: {int(score)}', True, (255, 255, 255))
+        score_rect = score_surface.get_rect(center=(288, 100))
+        screen.blit(score_surface, score_rect)
+
+        high_score_surface = game_font.render(f'Highest Score: {int(high_score)}', True, (255, 255, 255))
+        high_score_rect = high_score_surface.get_rect(center=(288, 850))
+        screen.blit(high_score_surface, high_score_rect)
+
+
+def update_score(current, highest):
+    if current > highest:
+        highest = current
+    return highest
+
+
+def pipe_score_check():
+    global score, can_score
+
+    if pipe_list:
+        for pipe in pipe_list:
+            if 95 < pipe.centerx < 105 and can_score:
+                score += 1
+                can_score = False
+            if pipe.centerx < 0:
+                can_score = True
+
+    if game_active:
+		#...
+        pipe_score_check()
+        score_display('main_game')
+    else:
+        high_score = update_score(score, high_score)
+        score_display('game_over')
+```
+
+### 7. Game Over Screen
+
+```python
+game_over_surface = pygame.transform.scale2x(pygame.image.load('assets/message.png'))
+game_over_rect = game_over_surface.get_rect(center=(288, 512))
+
+screen.blit(game_over_surface, game_over_rect)
+```
+
+### 8. SFX
+
+​ use `pygame.mixer` to play sounds
+
+#### 8.1 Import and play the sound
+
+```python
+flap_sound = pygame.mixer.Sound('sound/sfx_wing.wav')
+flap_sound.play()
+```
+
+#### 8.2 Handle the delay (early than pygame 2.0)
+
+​ To support all computer, pygame mixer run in a low quality mode, which cause a huge delay when playing sounds. By Pre-init the mixer and set the compatibility argument values can fix it.
+
+- Pre-init the `mixer`
+
+```python
+pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
+```
